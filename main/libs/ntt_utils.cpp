@@ -1,4 +1,6 @@
 #include <stdexcept>
+#include <cmath>
+#include <ctime>
 #include "ntt_utils.h"
 
 std::vector<uint64_t> ntt(const std::vector<uint64_t>& input, const std::vector<uint64_t>& w_table, uint64_t q){

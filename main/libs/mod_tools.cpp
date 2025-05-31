@@ -1,6 +1,8 @@
 #include "mod_tools.h"
 #include "prime_utils.h"
 #include <stdexcept>
+#include <cmath>
+#include <ctime>
 
 
 std::tuple<int64_t, int64_t, int64_t> extended_gcd(int64_t a, int64_t b){
