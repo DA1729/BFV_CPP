@@ -116,13 +116,12 @@ poly_tools poly_tools::operator*(const poly_tools& b) const{
     else{
 
         // ntt parameters
-        std::vector<uint64_t> w_table = n_p[0];
-        std::vector<uint64_t> wv_table = n_p[1];
-        std::vector<uint64_t> psi_table = n_p[2];
-        std::vector<uint64_t> psi_inv_table = n_p[3];
+        const std::vector<uint64_t>& w_table = n_p[0];
+        const std::vector<uint64_t>& wv_table = n_p[1];
+        const std::vector<uint64_t>& psi_table = n_p[2];
+        const std::vector<uint64_t>& psi_inv_table = n_p[3];
 
-        std::vector<uint64_t> s_p;
-        std::vector<uint64_t> b_p;
+        std::vector<uint64_t> s_p(n), b_p(n);
         for (size_t i = 0; i < n; i++){
             s_p[i] = (F[i] * psi_table[i]) % q;
             b_p[i] = (b.F[i] * psi_table[i]) % q;
@@ -131,7 +130,7 @@ poly_tools poly_tools::operator*(const poly_tools& b) const{
         std::vector<uint64_t> s_n = ntt(s_p, w_table, q);
         std::vector<uint64_t> b_n = ntt(b_p, w_table, q);
 
-        std::vector<uint64_t> sb_n;
+        std::vector<uint64_t> sb_n(n);
 
         for (size_t i = 0; i < n; i++){
             sb_n[i] = (s_n[i] * b_n[i]) % q;
@@ -139,9 +138,9 @@ poly_tools poly_tools::operator*(const poly_tools& b) const{
 
         std::vector<uint64_t> sb_p = intt(sb_n, wv_table, q);
 
-        std::vector<uint64_t> sb;
+        std::vector<uint64_t> sb(n);
 
-        for (size_t i = n; i < n; i++){
+        for (size_t i = 0; i < n; i++){
             sb[i] = (sb_p[i] * psi_inv_table[i]) % q;
         }
 
@@ -152,4 +151,98 @@ poly_tools poly_tools::operator*(const poly_tools& b) const{
 
     return result;
 
+}
+
+
+poly_tools poly_tools::operator%(uint64_t base) const{
+    poly_tools result(n, q, n_p);
+
+    for (size_t i = 0; i < n; i++){
+        result.F[i] = F[i] % base;
+    }
+    result.in_ntt = in_ntt;
+
+    return result;
+}
+
+poly_tools poly_tools::round() const{
+    poly_tools result(n, q, n_p);
+
+    for (size_t i = 0; i < n; i++){
+        result.F[i] = static_cast<uint64_t>(std::llround(static_cast<double>(F[i])));
+    }
+
+    result.in_ntt = in_ntt;
+
+    return result;
+}
+
+bool poly_tools::operator==(const poly_tools& b) const{
+    if (n != b.n){
+        return false;
+    }
+
+    else if (q != b.q){
+        return false;
+    }
+
+    else {
+        for (size_t i = 0; i < n; i++){
+            if (F[i] != b.F[i]){
+                return false;
+            }
+        }
+
+        return true;
+    }
+}
+
+poly_tools poly_tools::operator-() const{
+    poly_tools result(n, q, n_p);
+    
+    for (size_t i = 0; i < n; i++){
+        result.F[i] = ((-F[i]) % q);
+    }
+
+    result.in_ntt = in_ntt;
+
+    return result;
+}
+
+
+poly_tools poly_tools::to_ntt() const{
+    poly_tools result(n, q, n_p);
+
+    if (in_ntt == false){
+        result.F = ntt(F, n_p[0], q);
+        result.in_ntt = true;
+    }
+
+    else{
+        for (size_t i = 0; i < n; i++){
+            result.F[i] = F[i];
+        }
+        result.in_ntt = true;
+    }
+
+    return result;
+
+}
+
+poly_tools poly_tools::to_pol() const{
+    poly_tools result(n, q, n_p);
+
+    if (in_ntt == true){
+        result.F = intt(F, n_p[1], q);
+        result.in_ntt = false;
+    }
+
+    else{
+        for (size_t i = 0; i < n; i++){
+            result.F[i] = F[i];
+        }
+        result.in_ntt = false;
+    }
+
+    return result;
 }

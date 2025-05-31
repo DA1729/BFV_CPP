@@ -19,7 +19,7 @@ std::ostream& operator<<(std::ostream& os, const poly_tools& p);
 
 class poly_tools{
     public:
-        poly_tools(size_t n, uint64_t q, const std::vector<std::vector<uint64_t>>& np);
+        poly_tools(size_t n, uint64_t q, const std::vector<std::vector<uint64_t>>& n_p);
 
         void randomize(int B, bool domain = false, int type = 0, double mu = 0, double sigma = 0);
         
@@ -29,9 +29,11 @@ class poly_tools{
         poly_tools operator+(const poly_tools& b) const;
         poly_tools operator-(const poly_tools& b) const;
         poly_tools operator*(const poly_tools& b) const;
-        poly_tools operator%(const poly_tools& base) const;
+        poly_tools operator%(uint64_t base) const;
         poly_tools operator-() const;
         bool operator==(const poly_tools& b) const;
+
+        poly_tools round() const;
 
 
         poly_tools to_ntt() const;
