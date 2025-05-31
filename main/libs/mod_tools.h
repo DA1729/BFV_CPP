@@ -33,5 +33,5 @@ bool root_of_unity_check(uint64_t w, uint64_t m, uint64_t q);
 std::pair<bool, uint64_t> find_primitive_root(uint64_t m, uint64_t q, std::mt19937& rng);
 
 // bfv parameter generation
-std::tuple<uint64_t, uint64_t, uint64_t, uint64_t, uint64_tbfv_param_gen(int n, int logq, int lambda, std::mt19937& rng);
+std::tuple<uint64_t, uint64_t, uint64_t, uint64_t, uint64_t>bfv_param_gen(int n, int logq, int lambda, std::mt19937& rng);
 #endif
