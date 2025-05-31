@@ -22,7 +22,10 @@ std::vector<T> index_reverse(const std::vector<T>& a, int r);
 // polynomial functions
 
 // reduced polynomial multiplication
-std::vector<int64_t> red_pol_mul(const std::vector<int64_t>& poly_a, const std::vector<int64_t>& poly_b, int64_t m);
+std::vector<uint64_t> red_pol_mul(const std::vector<uint64_t>& poly_a, const std::vector<uint64_t>& poly_b, uint64_t m);
+
+// 2nd version without modulus
+std::vector<uint64_t> red_pol_mul_2(const std::vector<uint64_t>& poly_a, const std::vector<uint64_t>& poly_b);
 
 // ntt friendly prime generation
 uint64_t ntt_friendly_prime(int n, int logq, int lambda, std::mt19937& rng);

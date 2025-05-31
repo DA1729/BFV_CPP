@@ -74,11 +74,11 @@ std::vector<T> index_reverse(const std::vector<T>& a, int r){
 // polynomial functions
 
 // reduced polynomial multiplication
-std::vector<int64_t> red_pol_mul(const std::vector<int64_t>& poly_a, const std::vector<int64_t>& poly_b, int64_t m){
+std::vector<uint64_t> red_pol_mul(const std::vector<uint64_t>& poly_a, const std::vector<uint64_t>& poly_b, uint64_t m){
     size_t degree = poly_a.size();
 
     std::vector<int64_t> product_coeffs(2*degree, 0);
-    std::vector<int64_t> reduced_poly(degree, 0);
+    std::vector<uint64_t> reduced_poly(degree, 0);
 
     // normal multiplication modulo m
     for (size_t i = 0; i < degree; i++){
@@ -94,6 +94,28 @@ std::vector<int64_t> red_pol_mul(const std::vector<int64_t>& poly_a, const std::
         if (reduced_poly[i] < 0){
             reduced_poly[i] += m;
         }
+    }
+
+    return reduced_poly;
+}
+
+std::vector<uint64_t> red_pol_mul_2(const std::vector<uint64_t>& poly_a, const std::vector<uint64_t>& poly_b){
+    size_t degree = poly_a.size();
+
+    std::vector<int64_t> product_coeffs(2*degree, 0);
+    std::vector<uint64_t> reduced_poly(degree, 0);
+
+    // normal multiplication modulo m
+    for (size_t i = 0; i < degree; i++){
+        for (size_t j = 0; j < degree; j++){
+            product_coeffs[i + j] = (product_coeffs[i + j] + poly_a[i] * poly_b[j]);
+
+        }
+    }
+
+    // reducing modulo x^n + 1
+    for (size_t i = 0; i < degree; i++){
+        reduced_poly[i] = (product_coeffs[i] - product_coeffs[i + degree]);
     }
 
     return reduced_poly;

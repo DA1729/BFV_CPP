@@ -201,7 +201,7 @@ poly_tools poly_tools::operator-() const{
     poly_tools result(n, q, n_p);
     
     for (size_t i = 0; i < n; i++){
-        result.F[i] = ((-F[i]) % q);
+        result.F[i] = ((q-F[i]) % q);
     }
 
     result.in_ntt = in_ntt;
@@ -219,9 +219,7 @@ poly_tools poly_tools::to_ntt() const{
     }
 
     else{
-        for (size_t i = 0; i < n; i++){
-            result.F[i] = F[i];
-        }
+        result.F = F;
         result.in_ntt = true;
     }
 
@@ -238,9 +236,7 @@ poly_tools poly_tools::to_pol() const{
     }
 
     else{
-        for (size_t i = 0; i < n; i++){
-            result.F[i] = F[i];
-        }
+        result.F = F;
         result.in_ntt = false;
     }
 

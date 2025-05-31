@@ -15,17 +15,19 @@
 #include "prime_utils.h"
 
 
-std::ostream& operator<<(std::ostream& os, const poly_tools& p);
 
+//
 class poly_tools{
     public:
         poly_tools(size_t n, uint64_t q, const std::vector<std::vector<uint64_t>>& n_p);
-
+//
         void randomize(int B, bool domain = false, int type = 0, double mu = 0, double sigma = 0);
         
         std::string to_string() const;
-        friend std::ostream& operator<<(std::ostream& os, const poly_tools& p);
 
+        
+        //friend std::ostream& operator<<(std::ostream& os, const poly_tools& p);
+        //std::ostream& operator<<(std::ostream& os, const poly_tools& p);
         poly_tools operator+(const poly_tools& b) const;
         poly_tools operator-(const poly_tools& b) const;
         poly_tools operator*(const poly_tools& b) const;
@@ -39,7 +41,6 @@ class poly_tools{
         poly_tools to_ntt() const;
         poly_tools to_pol() const;
     
-    private:
         size_t n;
         uint64_t q;
         std::vector<std::vector<uint64_t>> n_p;
