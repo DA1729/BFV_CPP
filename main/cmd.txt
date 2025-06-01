@@ -1,0 +1,2 @@
+g++ -I./bfv_lib -I./libs -o main bfv_main.cpp ./bfv_lib/bfv_lib.cpp ./libs/*.cpp
+

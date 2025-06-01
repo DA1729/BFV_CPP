@@ -1,298 +1,351 @@
-#include <vector>
-#include <cstdint>
-#include <cstddef>
-#include <random>
-#include <chrono>
-#include <iostream>
-#include <utility>
-#include <string>
-#include "./../libs/mod_tools.h"
-#include "./../libs/ntt_utils.h"
-#include "./../libs/prime_utils.h"
-#include "./../libs/poly_tools.h"
 #include "bfv_lib.h"
+#include "./../libs/poly_utils.h"
+#include <cmath>
+#include <iostream>
+#include <algorithm>
+#include <numeric>
+#include <unordered_set>
+#include <sstream>
+#include <string>
 
-using namespace std;
+bfv::bfv(int64_t n, int64_t q, int64_t t, double mu, double sigma, ntt_params qnp)
+    : n(n), q(q), t(t), T(0), l(0), p(0), mu(mu), sigma(sigma), qnp(qnp)
+    {
+        s_k = poly_init(n, q, qnp);
 
-int64_t mod(int64_t a, int64_t m){
-    int64_t r = a % m;
-    return r < 0 ? r + m : r;
+        p_k.clear();
+        rl_k1.clear();
+        rl_k2.clear();
+    }
+
+std::string bfv::to_string() const{
+    std::ostringstream oss;
+
+    oss << "\n--- Parameters:\n";
+    oss << "n     : " << n << "\n";
+    oss << "q     : " << q << "\n";
+    oss << "t     : " << t << "\n";
+    oss << "T     : " << T << "\n";
+    oss << "l     : " << l << "\n";
+    oss << "p     : " << p << "\n";
+    oss << "mu    : " << mu << "\n";
+    oss << "sigma : " << sigma << "\n";
+    return oss.str();
+
 }
 
-inline uint64_t round_to_int(double x) {
-    return static_cast<uint64_t>(std::round(x));
+void bfv::print_params(){
+    std::cout << to_string() << std::endl;
 }
-
-
-bfv::bfv(size_t n, uint64_t q, uint64_t t, uint64_t T, uint64_t l, uint64_t p,
-         double mu, double sigma, const std::vector<std::vector<uint64_t>>& qnp)
-    : n(n), q(q), t(t), T(T), l(l), p(p), mu(mu), sigma(sigma), qnp(qnp),
-      s_k(n, q, qnp)
-{}
 
 void bfv::secret_key_gen(){
-    poly_tools s(n, q, qnp);
-    s.randomize(2);
-    s_k = s;
+
+    poly_utils_1 s_k = poly_init(n, q, qnp);
+    poly_randomize(s_k, 2);
+
 }
 
 void bfv::public_key_gen(){
-    poly_tools a(n, q, qnp);
-    poly_tools e(n, q, qnp);
+    poly_utils_1 a, e;
+    a = poly_init(n, q, qnp);
+    e = poly_init(n, q, qnp);
 
-    a.randomize(q);
-    e.randomize(0, false, 1, mu, sigma);
+    poly_randomize(a, q);
+    poly_randomize(e, 0, false, 1, mu, sigma);
 
-    poly_tools p_k_0 = -(a * s_k + e);
-    poly_tools p_k_1 = a;
+    poly_utils_1 temp = poly_init(n, q, qnp);
+
+    temp = poly_mul(a, s_k);
+    temp = poly_add(temp, e);
+    temp = poly_neg(temp);
+
+    poly_utils_1 p_k0 = poly_init(n, q, qnp), p_k1 = poly_init(n, q, qnp);
+
+    poly_copy(p_k0, temp);
+    poly_copy(p_k1, a);
 
     p_k.clear();
-    p_k.push_back(p_k_0);
-    p_k.push_back(p_k_1);
+    p_k.push_back(p_k0);
+    p_k.push_back(p_k1);
+    
 }
 
-void bfv::eval_key_gen_1(uint64_t T_in){
-    T = T_in;
-    l = static_cast<uint64_t>(std::floor(std::log(q)/std::log(T)));
+void bfv::eval_key_gen_1(){
+    T = 1 << 4;
+    l = static_cast<int>(std::floor(std::log(q) / std::log(T)));
 
-    rl_k_1.clear();
+    poly_utils_1 s_sq = poly_init(n, q, qnp);
+    s_sq = poly_mul(s_k, s_k);
 
-    poly_tools sk_squared = s_k * s_k;
+    rl_k1.clear();
 
-    for (uint64_t i = 0; i <= l; i++){
-        poly_tools ai(n, q, qnp);
-        poly_tools ei(n, q, qnp);
+    for (size_t i = 0; i < n; i++){
+        poly_utils_1 a = poly_init(n, q, qnp), e = poly_init(n, q, qnp), ts2 = poly_init(n, q, qnp), temp0 = poly_init(n, q, qnp), temp1 = poly_init(n, q, qnp);
 
-        ai.randomize(q);
-        ei.randomize(0, false, 1, mu, sigma);
-
-        poly_tools ts_2(n, q, qnp);
-
-        ts_2.F.resize(n);
+        poly_randomize(a, q);
+        poly_randomize(e, 0, false, 1, mu, sigma);
 
         for (size_t j = 0; j < n; j++){
-            ts_2.F[j] = (mod_pow(T, i, q) * sk_squared.F[j]) % q;
+            ts2.F[j] = (static_cast<int64_t>(std::pow(T, i)) * s_sq.F[j]) % q;
         }
 
-        poly_tools rl_ki0 = ts_2 - (ai * s_k + ei);
-        poly_tools rl_ki1 = ai;
+        temp0 = poly_mul(a, s_k);
+        temp0 = poly_add(temp0, e);
+        temp0 = poly_sub(ts2, temp0);
 
-        rl_k_1.emplace_back(rl_ki0, rl_ki1);
-
-
-
+        poly_copy(temp1, a);
+        rl_k1.push_back({temp0, temp1});
     }
 }
 
+void bfv::eval_key_gen_2(){
+    rl_k2.clear();
 
-void bfv::eval_key_gen_2(uint64_t p_in){
-    p = p_in;
-    uint64_t pq = p * q;
+    poly_utils_1 a = poly_init(n, p*q, qnp), e = poly_init(n, p*q, qnp), c = poly_init(n, p*q, qnp), temp1 = poly_init(n, p*q, qnp);
 
-    rl_k_2.clear();
+    poly_randomize(a, p*q);
+    poly_randomize(e, 0, false, 1, mu, sigma);
 
-    poly_tools a(n, pq, qnp);
-    poly_tools e(n, pq, qnp);
+    poly_utils_1 sk_sq = poly_init(n, p*q, qnp);
+    sk_sq = poly_mul(s_k, s_k);
 
-    a.randomize(pq);
-    e.randomize(0, false, 1, mu, sigma);
+    temp1 = poly_mul(a, s_k);
+    temp1 = poly_add(temp1, e);
 
-
-    std::vector<uint64_t> c0 = red_pol_mul_2(a.F, s_k.F);
-
-    for (size_t i = 0; i < n; ++i) {
-        c0[i] = (c0[i] + e.F[i]) % pq;
+    for (size_t i = 0; i < n; i++){
+        temp1.F[i] = ((p * q) - (temp1.F[i] % (p * q))) % (p * q);
     }
 
-    // Step 3: c1 = p * sk^2
-    std::vector<uint64_t> c1 = red_pol_mul_2(s_k.F, s_k.F);
-    for (size_t i = 0; i < n; ++i) {
-        c1[i] = (p * c1[i]) % pq;
+    for (size_t i = 0; i < n; i++){
+        c.F[i] = (temp1.F[i] + (p * sk_sq.F[i])) % (p * q);
     }
 
-    // Step 4: c2 = (c1 - c0) % pq
-    std::vector<uint64_t> c2(n);
-    for (size_t i = 0; i < n; ++i) {
-        c2[i] = (c1[i] + pq - c0[i]) % pq;
-    }
-
-    // Step 5: store result in poly_tools
-    poly_tools c(n, pq, qnp);
-    c.F = c2;
-
-    rl_k_2.emplace_back(c);
-    rl_k_2.emplace_back(a);
-}
-
-std::vector<poly_tools> bfv::encryption(const poly_tools& m_in){
-
-    int64_t delta = static_cast<int64_t>(std::floor(q / t));
-
-    poly_tools u(n, q, qnp), e1(n, q, qnp), e2(n, q, qnp);
-    u.randomize(2);
-    e1.randomize(0, false, 1, mu, sigma);
-    e2.randomize(0, false, 1, mu, sigma);
-
-    poly_tools md(n, q, qnp);
-    for (int i = 0; i < n; i++) {
-        md.F[i] = (delta * m_in.F[i]) % q;
-    }
-
-    poly_tools c0 = p_k[0] * u + e1 + md;
-    poly_tools c1 = p_k[1] * u + e2;
-
-    return {c0, c1};
+    rl_k2.push_back(c);
+    rl_k2.push_back(a);
 
 }
 
-poly_tools bfv::decryption(const std::vector<poly_tools> &c_t_in){
-    poly_tools m = c_t_in[1] * s_k + c_t_in[0];
 
-    for (int i = 0; i < n; i++) {
-        m.F[i] = round_to_int((t * m.F[i]) / static_cast<double>(q)) % t;
+std::vector<poly_utils_1> bfv::encryption(const poly_utils_1& m){
+    std::vector<poly_utils_1> cipher_text;
+
+    int64_t delta = q/t;
+
+    poly_utils_1 u = poly_init(n, q, qnp), e1 = poly_init(n, q, qnp), e2 = poly_init(n, q, qnp), md = poly_init(n, q, qnp), c0 = poly_init(n, q, qnp), c1 = poly_init(n, q, qnp);
+
+    poly_randomize(u, 2);
+    poly_randomize(e1, 0, false, 1, mu, sigma);
+    poly_randomize(e2, 0, false, 1, mu, sigma);
+
+    for (size_t i = 0; i < n; i++){
+        md.F[i] = (delta * m.F[i]) % q;
     }
 
-    poly_tools mr(n, t, qnp);
+    c0 = poly_mul(p_k[0], u);
+
+    for (size_t i = 0; i < n; i++){
+        c0.F[i] = (c0.F[i] + e1.F[i] + md.F[i]) % q;
+    }
+
+    c1 = poly_mul(p_k[1], u);
+
+    for (size_t i = 0; i < n; i++){
+        c1.F[i] = (c1.F[i] + e2.F[i]) % q;
+    }
+
+    cipher_text.push_back(c0);
+    cipher_text.push_back(c1);
+
+    return cipher_text;
+}
+
+poly_utils_1 bfv::decryption(const std::vector<poly_utils_1>& c_t){
+    poly_utils_1 m = poly_init(n, q, qnp), temp = poly_init(n, q, qnp);
+
+    temp = poly_mul(c_t[1], s_k);
+    m = poly_add(temp, c_t[0]);
+
+
+    for (size_t i = 0; i < n; i++){
+        double scaled = (double)(m.F[i]) * ((double)t / (double)q);
+        m.F[i] = (int)std::round(scaled)%t;
+        
+        if (m.F[i] < 0) m.F[i] += t;
+    }
+
+    m.in_ntt = false;
+    return m;
+
+
+}
+
+poly_utils_1 bfv::decryption_2(const std::vector<poly_utils_1>& c_t){
+    poly_utils_1 sk2 = poly_mul(s_k, s_k);
+    poly_utils_1 m = poly_add(c_t[0], poly_add(poly_mul(c_t[1], s_k), poly_mul(c_t[2], sk2)));
+
+    for (size_t i = 0; i < n; i++){
+        double scaled = ((double)t * m.F[i]) / q;
+        m.F[i] = ((int64_t)std::round(scaled)) % t;
+        if (m.F[i] < 0) m.F[i] += t;
+    }
+
+    poly_utils_1 mr = poly_init(n, t, qnp);
     mr.F = m.F;
     mr.in_ntt = m.in_ntt;
-    return mr;
 
-    poly_tools sk2 = s_k * s_k;
-    poly_tools m = c_t_in[0] + c_t_in[1] * s_k + c_t_in[2] * sk2;
-
-    for (int i = 0; i < n; i++) {
-        m.F[i] = round_to_int((t * m.F[i]) / static_cast<double>(q)) % t;
-    }
-
-    poly_tools mr(n, t, qnp);
-    mr.F = m.F;
-    mr.in_ntt = m.in_ntt;
-    return mr;
-
+    return mr;  
 }
 
+std::vector<poly_utils_1> bfv::homomorphic_addition(const std::vector<poly_utils_1>& c_t0, const std::vector<poly_utils_1>& c_t1){
+    std::vector<poly_utils_1> result;
+    poly_utils_1 c0 = poly_init(n, q, qnp), c1 = poly_init(n, q, qnp);
 
-poly_tools bfv::decryption_2(const std::vector<poly_tools> &c_t_in){
-    poly_tools sk2 = s_k * s_k;
-    poly_tools m = c_t_in[0] + c_t_in[1] * s_k + c_t_in[2] * sk2;
-
-    for (int i = 0; i < n; i++) {
-        m.F[i] = round_to_int((t * m.F[i]) / static_cast<double>(q)) % t;
+    for (size_t i = 0; i < n; i++){
+        c0.F[i] = (c_t0[0].F[i] + c_t1[0].F[i]) % q;
+        c1.F[i] = (c_t0[1].F[i] + c_t1[1].F[i]) % q;
     }
 
-    poly_tools mr(n, t, qnp);
-    mr.F = m.F;
-    mr.in_ntt = m.in_ntt;
-    return mr;
-}
+    result.push_back(c0);
+    result.push_back(c1);
 
-std::vector<poly_tools> bfv::relinearization_1(const std::vector<poly_tools> &ct){
-    poly_tools c0 = ct[0];
-    poly_tools c1 = ct[1];
-    poly_tools c2 = ct[2];
-
-    std::vector<poly_tools> c2i;
-    poly_tools c2q(n, q, qnp);
-    c2q.F = c2.F;
-
-    for (int i = 0; i <= l; i++) {
-        poly_tools c2r(n, q, qnp);
-        for (int j = 0; j < n; j++) {
-            int qt = c2q.F[j] / T;
-            int rt = c2q.F[j] - qt * T;
-            c2q.F[j] = qt;
-            c2r.F[j] = rt;
-        }
-        c2i.push_back(c2r);
-    }
-
-    poly_tools c0r = c0;
-    poly_tools c1r = c1;
-
-    for (int i = 0; i <= l; i++) {
-        c0r = c0r + (rl_k_1[i].first * c2i[i]);
-        c1r = c1r + (rl_k_1[i].second * c2i[i]);
-    }
-
-    return {c0r, c1r};
-
-}
-
-std::vector<poly_tools> bfv::relinearization_1(const std::vector<poly_tools> &ct){
-    poly_tools c0 = ct[0];
-    poly_tools c1 = ct[1];
-    poly_tools c2 = ct[2];
-
-    std::vector<uint64_t> c2_0 = red_pol_mul_2(c2.F, rl_k_2[0].F);
-    std::vector<uint64_t> c2_1 = red_pol_mul_2(c2.F, rl_k_2[1].F);
-
-    for (auto &x : c2_0) x = round_to_int(x / static_cast<double>(p)) % q;
-    for (auto &x : c2_1) x = round_to_int(x / static_cast<double>(p)) % q;
-
-    poly_tools c0e(n, q, qnp); c0e.F = c2_0;
-    poly_tools c1e(n, q, qnp); c1e.F = c2_1;
-
-    poly_tools c0r = c0e + c0;
-    poly_tools c1r = c1e + c1;
-
-    return {c0r, c1r};
-}
-
-poly_tools bfv::int_encode(int64_t m){
-    poly_tools mr(n, q, qnp);
-    if (m > 0) {
-        int64_t mt = m;
-        for (int i = 0; i < n; i++) {
-            mr.F[i] = mt % 2;
-            mt /= 2;
-        }
-    } else if (m < 0) {
-        int64_t mt = -m;
-        for (int i = 0; i < n; i++) {
-            mr.F[i] = (t - (mt % 2)) % t;
-            mt /= 2;
-        }
-    }
-    return mr;
-
-}
-
-int64_t bfv::int_decode(const poly_tools& m){
-    int64_t result = 0;
-    int64_t threshold = (t == 2) ? 2 : ((t + 1) >> 1);
-    for (int i = 0; i < n; i++) {
-        int64_t c = m.F[i];
-        int64_t c_ = (c >= threshold) ? -(t - c) : c;
-        result += (c_ * (1LL << i));
-    }
     return result;
 }
 
-// homomorphic evaluations
-std::vector<poly_tools> bfv::homomorphic_addition(const std::vector<poly_tools> &ct0, const std::vector<poly_tools> &ct1){
-    return {ct0[0] + ct1[0], ct0[1] + ct1[1]};
+std::vector<poly_utils_1> bfv::homomorphic_subtraction(const std::vector<poly_utils_1>& c_t0, const std::vector<poly_utils_1>& c_t1){
+    std::vector<poly_utils_1> result;
+    poly_utils_1 c0 = poly_init(n, q, qnp), c1 = poly_init(n, q, qnp);
+
+    for (size_t i = 0; i < n; i++){
+        c0.F[i] = (c_t0[0].F[i] - c_t1[0].F[i] + q) % q;
+        c1.F[i] = (c_t0[1].F[i] - c_t1[1].F[i] + q) % q;
+
+    }
+
+    result.push_back(c0);
+    result.push_back(c1);
+
+    return result;
 }
 
-std::vector<poly_tools> bfv::homomorphic_subtraction(const std::vector<poly_tools> &ct0, const std::vector<poly_tools> &ct1){
-    return {ct0[0] - ct1[0], ct0[1] - ct1[1]};
+std::vector<poly_utils_1> bfv::homomorphic_multiplication(const std::vector<poly_utils_1>& c_t0, const std::vector<poly_utils_1>& c_t1){
+    poly_utils_1 c0 = poly_init(n, q, qnp), c1 = poly_init(n, q, qnp), c2 = poly_init(n, q, qnp);
+
+    std::vector<int64_t> r0 = red_pol_mul_2(c_t0[0].F, c_t1[0].F);
+    std::vector<int64_t> r1 = red_pol_mul_2(c_t0[0].F, c_t1[1].F);
+    std::vector<int64_t> r2 = red_pol_mul_2(c_t0[1].F, c_t1[0].F);
+    std::vector<int64_t> r3 = red_pol_mul_2(c_t0[1].F, c_t1[1].F);
+
+    for (size_t i = 0; i < n; i++){
+        double val_c0 = ((double)r0[i]) * ((double)t / (double)q);
+        double val_c1 = ((double)(r1[i] + r2[i])) * ((double)t / (double)q);
+        double val_c2 = ((double)r3[i]) * ((double)t / (double)q);
+
+        c0.F[i] = (int64_t)std::round(val_c0) % q;
+        c1.F[i] = (int64_t)std::round(val_c1) % q;
+        c2.F[i] = (int64_t)std::round(val_c2) % q;
+
+        if (c0.F[i] < 0) c0.F[i] += q;
+        if (c1.F[i] < 0) c1.F[i] += q;
+        if (c2.F[i] < 0) c2.F[i] += q;
+
+    }
+
+    return {c0, c1, c2};
+
+
 }
 
-std::vector<poly_tools> bfv::homomorphic_multiplication(const std::vector<poly_tools> &ct0, const std::vector<poly_tools> &ct1){
-    std::vector<uint64_t> r0 = red_pol_mul_2(ct0[0].F, ct1[0].F);
-    std::vector<uint64_t> r1 = red_pol_mul_2(ct0[0].F, ct1[1].F);
-    std::vector<uint64_t> r2 = red_pol_mul_2(ct0[1].F, ct1[0].F);
-    std::vector<uint64_t> r3 = red_pol_mul_2(ct0[1].F, ct1[1].F);
+// encoding and decoding
+poly_utils_1 bfv::int_encode(int64_t m){
+    poly_utils_1 encoded = poly_init(n, t, qnp);
 
-    std::vector<int64_t> c0(r0.size()), c1(r1.size()), c2(r3.size());
-    for (size_t i = 0; i < r0.size(); ++i) c0[i] = round_to_int((t * r0[i]) / static_cast<double>(q)) % q;
-    for (size_t i = 0; i < r1.size(); ++i) c1[i] = round_to_int((t * (r1[i] + r2[i])) / static_cast<double>(q)) % q;
-    for (size_t i = 0; i < r3.size(); ++i) c2[i] = round_to_int((t * r3[i]) / static_cast<double>(q)) % q;
+    if (m > 0) {
+        int mt = m;
+        for (size_t i = 0; i < n; i++){
+            encoded.F[i] = mt % 2;
+            mt /= 2;
+        }
+    } else if (m < 0){
+        int mt = -m;
+        for (size_t i = 0; i < n; i++){
+            encoded.F[i] = (t - (mt % 2)) % t;
+            mt /= 2;
+        }
+    } else{
 
-    poly_tools p0(n, q, qnp), p1(n, q, qnp), p2(n, q, qnp);
-    p0.F = std::vector<uint64_t>(c0.begin(), c0.end());
-    p1.F = std::vector<uint64_t>(c1.begin(), c1.end());;
-    p2.F = std::vector<uint64_t>(c2.begin(), c2.end());
+    }
 
-    return {p0, p1, p2};
+    return encoded;
+}
 
+int64_t bfv::int_decode(const poly_utils_1& m){
+    int result = 0;
+    int64_t threshold = (t == 2) ? 2 : ((t + 1) >> 1);
+
+    for (size_t i = 0; i < n; i++){
+        int64_t c = m.F[i];
+        int64_t c_ = (c >= threshold) ? -(t - c) : c;
+        result += c_ * (1LL << i);
+    }
+
+    return result;
+}
+
+
+std::vector<poly_utils_1> bfv::relinearization_1(const std::vector<poly_utils_1>& c_t){
+    poly_utils_1 c0 = c_t[0];
+    poly_utils_1 c1 = c_t[1];
+    poly_utils_1 c2 = c_t[2];
+
+    std::vector<poly_utils_1> c2i;
+    poly_utils_1 c2q = poly_init(n, q, qnp);
+    c2q.F = c2.F;
+
+    for (size_t i = 0; i <= l; i++){
+        poly_utils_1 c2r = poly_init(n, q, qnp);
+        for (size_t j = 0; j < n; j++){
+            int64_t qt = c2q.F[j] / T;
+            int64_t rt = c2q.F[j] - qt * T;
+
+            c2q.F[j] = qt;
+            c2r.F[j] = rt;
+        }
+
+        c2i.push_back(c2r);
+    }
+
+    poly_utils_1 c0r = poly_init(n, q, qnp), c1r = poly_init(n, q, qnp);
+    c0r.F = c0.F;
+    c1r.F = c1.F;
+
+    for (size_t i = 0; i < l; i++){
+        c0r = poly_add(c0r, poly_mul(rl_k1[i][0], c2i[i]));
+        c1r = poly_add(c1r, poly_mul(rl_k1[i][1], c2i[i]));
+        
+    }
+
+    return {c0r, c1r};
+}
+
+std::vector<poly_utils_1> bfv::relinearization_2(const std::vector<poly_utils_1>& c_t){
+    poly_utils_1 c0 = c_t[0];
+    poly_utils_1 c1 = c_t[1];
+    poly_utils_1 c2 = c_t[2];
+
+    std::vector<int64_t> c2_0 = red_pol_mul_2(c2.F, rl_k2[0].F);
+    std::vector<int64_t> c2_1 = red_pol_mul_2(c2.F, rl_k2[1].F);
+
+    for (size_t i = 0; i < n; i++){
+        c2_0[i] = ((int64_t)std::round((double)c2_0[i] / p)) % q;
+        c2_1[i] = ((int64_t)std::round((double)c2_1[i] / p)) % q;
+    }
+
+    poly_utils_1 c0e = poly_init(n, q, qnp), c1e = poly_init(n, q, qnp);
+    c0e.F = c2_0;
+    c1e.F = c2_1;                  
+    
+    poly_utils_1 c0r = poly_add(c0, c0e);
+    poly_utils_1 c1r = poly_add(c1, c1e);
+
+    return {c0r, c1r};
 }

@@ -3,8 +3,8 @@
 #include <stdexcept>
 #include <ctime>
 
-uint64_t mod_pow(uint64_t base, uint64_t exp, uint64_t mod) {
-    uint64_t result = 1;
+int64_t mod_pow(int64_t base, int64_t exp, int64_t mod) {
+    int64_t result = 1;
     base %= mod;
     while (exp > 0) {
         if (exp & 1)
@@ -30,18 +30,18 @@ std::vector<int> get_low_primes() {
     };
 }
 
-bool miller_rabin(uint64_t p, int lambda, std::mt19937& rng) {
-    uint64_t r = p - 1;
+bool miller_rabin(int64_t p, int lambda, std::mt19937& rng) {
+    int64_t r = p - 1;
     int u = 0;
     while ((r & 1) == 0) {
         ++u;
         r >>= 1;
     }
 
-    std::uniform_int_distribution<uint64_t> dist(2, p - 2);
+    std::uniform_int_distribution<int64_t> dist(2, p - 2);
     for (int i = 0; i < lambda; ++i) {
-        uint64_t a = dist(rng);
-        uint64_t z = mod_pow(a, r, p);
+        int64_t a = dist(rng);
+        int64_t z = mod_pow(a, r, p);
         if (z != 1 && z != p - 1) {
             for (int j = 0; j < u - 1; ++j) {
                 z = mod_pow(z, 2, p);
@@ -55,7 +55,7 @@ bool miller_rabin(uint64_t p, int lambda, std::mt19937& rng) {
     return true;
 }
 
-bool is_prime(uint64_t n, int lambda, std::mt19937& rng) {
+bool is_prime(int64_t n, int lambda, std::mt19937& rng) {
     if (n < 2) return false;
     if (n == 2) return true;
 
@@ -68,12 +68,12 @@ bool is_prime(uint64_t n, int lambda, std::mt19937& rng) {
     return miller_rabin(n, lambda, rng);
 }
 
-uint64_t generate_large_prime(int bit_length, int lambda, std::mt19937& rng) {
+int64_t generate_large_prime(int bit_length, int lambda, std::mt19937& rng) {
     int attempts = 100 * (std::log2(bit_length) + 1);
-    std::uniform_int_distribution<uint64_t> dist((1ULL << (bit_length - 1)), (1ULL << bit_length) - 1);
+    std::uniform_int_distribution<int64_t> dist((1ULL << (bit_length - 1)), (1ULL << bit_length) - 1);
 
     while (attempts-- > 0) {
-        uint64_t candidate = dist(rng);
+        int64_t candidate = dist(rng);
         if (is_prime(candidate, lambda, rng)) {
             return candidate;
         }

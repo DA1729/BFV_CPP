@@ -3,9 +3,9 @@
 #include <ctime>
 #include "ntt_utils.h"
 
-std::vector<uint64_t> ntt(const std::vector<uint64_t>& input, const std::vector<uint64_t>& w_table, uint64_t q){
+std::vector<int64_t> ntt(const std::vector<int64_t>& input, const std::vector<int64_t>& w_table, int64_t q){
     size_t n = input.size();
-    std::vector<uint64_t> output(input);
+    std::vector<int64_t> output(input);
 
     int levels = std::log2(n);
     
@@ -22,9 +22,9 @@ std::vector<uint64_t> ntt(const std::vector<uint64_t>& input, const std::vector<
                 int s = j*(step << 1) + k;
                 int t = s + step;
 
-                uint64_t w = w_table[(1 << i) *k];
-                uint64_t u = output[s];
-                uint64_t v = output[t];
+                int64_t w = w_table[(1 << i) *k];
+                int64_t u = output[s];
+                int64_t v = output[t];
 
                 output[s] = (u + v) % q;
                 output[t] = ((q + u - v)*w)%q;
@@ -36,9 +36,9 @@ std::vector<uint64_t> ntt(const std::vector<uint64_t>& input, const std::vector<
     return output;
 }
 
-std::vector<uint64_t> intt(const std::vector<uint64_t>& input, const std::vector<uint64_t>& w_table, uint64_t q){
+std::vector<int64_t> intt(const std::vector<int64_t>& input, const std::vector<int64_t>& w_table, int64_t q){
     size_t n = input.size();
-    std::vector<uint64_t> output(input);
+    std::vector<int64_t> output(input);
 
     int levels = std::log2(n);
     if ((1ULL << levels) != n) {
@@ -53,9 +53,9 @@ std::vector<uint64_t> intt(const std::vector<uint64_t>& input, const std::vector
                 int s = j * (step << 1) + k;
                 int t = s + step;
 
-                uint64_t w = w_table[(1 << i) * k];
-                uint64_t u = output[s];
-                uint64_t v = output[t];
+                int64_t w = w_table[(1 << i) * k];
+                int64_t u = output[s];
+                int64_t v = output[t];
 
                 output[s] = (u + v) % q;
                 output[t] = ((q + u - v) * w) % q;
@@ -65,7 +65,7 @@ std::vector<uint64_t> intt(const std::vector<uint64_t>& input, const std::vector
 
     output = index_reverse(output, levels);
 
-    uint64_t n_inv = mod_inv(n, q);
+    int64_t n_inv = mod_inv(n, q);
     for (auto& val : output) {
         val = (val * n_inv) % q;
     }
