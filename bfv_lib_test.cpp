@@ -7,22 +7,18 @@
 int main() {
     std::cout << "--- Starting BFV Demo" << std::endl;
     
-    // Parameter generation (corresponding to Python code)
     int64_t t = 16;
     int64_t n = 1024;
     int64_t q = 132120577;  // log(q) = 27
     int64_t psi = 73993;
     
-    // Calculate other necessary parameters
     int64_t psiv = mod_inv(psi, q);
     int64_t w = mod_pow(psi, 2, q);
     int64_t wv = mod_inv(w, q);
     
-    // Determine mu, sigma (for discrete gaussian distribution)
     double mu = 0.0;
     double sigma = 0.5 * 3.2;
     
-    // Generate polynomial arithmetic tables
     std::vector<int64_t> w_table(n, 1);
     std::vector<int64_t> wv_table(n, 1);
     std::vector<int64_t> psi_table(n, 1);
@@ -35,28 +31,21 @@ int main() {
         psiv_table[i] = (psiv_table[i-1] * psiv) % q;
     }
     
-    // Create ntt_params structure
     ntt_params qnp;
     qnp.w = w_table;
     qnp.w_inv = wv_table;
     qnp.psi = psi_table;
     qnp.psi_inv = psiv_table;
     
-    // Generate BFV evaluator
     bfv Evaluator(n, q, t, mu, sigma, qnp);
     
-    // Generate Keys
     Evaluator.secret_key_gen();
     Evaluator.public_key_gen();
     Evaluator.eval_key_gen_1();
-    // Note: eval_key_gen_2() requires setting p parameter first
-    // Evaluator.p = q*q*q + 1; // Set p for relinearization v2
-    // Evaluator.eval_key_gen_2();
     
-    // Print system parameters
     Evaluator.print_params();
     
-    // Generate random messages
+    // Generating random messages
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_int_distribution<int64_t> dis(-(1LL << 15), (1LL << 15) - 1);
@@ -72,27 +61,25 @@ int main() {
     std::cout << "* n1*n2: " << (n1 * n2) << std::endl;
     std::cout << std::endl;
     
-    // Encode random messages into plaintext polynomials
     std::cout << "--- n1 and n2 are encoded as polynomials m1(x) and m2(x)." << std::endl;
     poly_utils_1 m1 = Evaluator.int_encode(n1);
     poly_utils_1 m2 = Evaluator.int_encode(n2);
     
     std::cout << "* m1(x): [";
-    for (int64_t i = 0; i < 10; i++) { // Print first 10 coefficients
+    for (int64_t i = 0; i < 10; i++) { 
         std::cout << m1.F[i];
         if (i < 9) std::cout << ", ";
     }
     std::cout << ", ...]" << std::endl;
     
     std::cout << "* m2(x): [";
-    for (int64_t i = 0; i < 10; i++) { // Print first 10 coefficients
+    for (int64_t i = 0; i < 10; i++) { 
         std::cout << m2.F[i];
         if (i < 9) std::cout << ", ";
     }
     std::cout << ", ...]" << std::endl;
     std::cout << std::endl;
     
-    // Encrypt messages
     std::vector<poly_utils_1> ct1 = Evaluator.encryption(m1);
     std::vector<poly_utils_1> ct2 = Evaluator.encryption(m2);
     
@@ -112,10 +99,8 @@ int main() {
     std::cout << ", ...]" << std::endl;
     std::cout << std::endl;
     
-    // Test basic encryption/decryption without homomorphic operations
     std::cout << "--- Testing basic encryption/decryption (no homomorphic operations)" << std::endl;
     
-    // Decrypt ct1 and ct2 to verify they match original messages
     poly_utils_1 decrypted_m1 = Evaluator.decryption(ct1);
     poly_utils_1 decrypted_m2 = Evaluator.decryption(ct2);
     
@@ -196,7 +181,7 @@ int main() {
     }
     std::cout << std::endl;
     
-    // Multiply two messages (no relinearization)
+    // Homomomorphic multiplication (no relinearization)
     std::vector<poly_utils_1> ct_mul = Evaluator.homomorphic_multiplication(ct1, ct2);
     poly_utils_1 mt_mul = Evaluator.decryption_2(ct_mul); // Use decryption_2 for 3-element ciphertext
     int64_t nr_mul = Evaluator.int_decode(mt_mul);
@@ -228,7 +213,7 @@ int main() {
     }
     std::cout << std::endl;
     
-    // Multiply two messages (relinearization v1)
+    // Homomorphic multiplication (relinearization v1)
     std::vector<poly_utils_1> ct_mul_relin = Evaluator.homomorphic_multiplication(ct1, ct2);
     ct_mul_relin = Evaluator.relinearization_1(ct_mul_relin);
     poly_utils_1 mt_mul_relin = Evaluator.decryption(ct_mul_relin); // Use regular decryption for 2-element ciphertext
